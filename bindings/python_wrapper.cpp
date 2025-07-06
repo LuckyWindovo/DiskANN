@@ -85,8 +85,8 @@ private:
     }
 
 public:
-    DiskANNIndex() : is_built_(false), save_index_as_one_file_(true) {
-        working_folder_ = "../data/freshdiskann_working";
+    DiskANNIndex() : is_built_(false), save_index_as_one_file_(false) {
+        working_folder_ = "./data/freshdiskann_working";
         mem_prefix_ = working_folder_ + "/mem_index";
         base_prefix_ = working_folder_ + "/base_index";
         merge_prefix_ = working_folder_ + "/merge_index";
@@ -98,11 +98,11 @@ public:
 
     ~DiskANNIndex() {
         // 清理临时文件
-        system(("rm -rf " + working_folder_).c_str());
+        // system(("rm -rf " + working_folder_).c_str());
     }
 
     void setup(uint32_t max_pts, uint32_t ndim, uint32_t R = 64,
-               uint32_t L = 100, uint32_t num_threads = 8) {
+               uint32_t L = 100, uint32_t num_threads = 1) {
         max_pts_ = max_pts;
         ndim_ = ndim;
         R_ = R;
@@ -141,7 +141,7 @@ public:
         // 构建基础索引
         std::cout << "Building base disk index..." << std::endl;
         std::string build_params = std::to_string(R_) + " " + std::to_string(L_) +
-                                  " " + std::to_string(R_ * 2) + " " + std::to_string(L_) +
+                                  " " + std::to_string(3) + " " + std::to_string(3) +
                                   " " + std::to_string(num_threads_);
 
         bool success = diskann::build_disk_index<T>(

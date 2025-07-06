@@ -193,6 +193,7 @@ namespace diskann {
 
   inline void alloc_aligned(void** ptr, size_t size, size_t align) {
     *ptr = nullptr;
+    size = ((size + align - 1) / align) * align;
     assert(IS_ALIGNED(size, align));
 #ifndef _WINDOWS
     *ptr = ::aligned_alloc(align, size);
