@@ -166,7 +166,7 @@ public:
         params.Set<unsigned>("R_disk", R_);
         params.Set<float>("alpha_disk", 1.2f);
         params.Set<unsigned>("C", R_ * 2);
-        params.Set<unsigned>("beamwidth", 2);
+        params.Set<unsigned>("beamwidth", 4);
         params.Set<unsigned>("nodes_to_cache", 100);
         params.Set<unsigned>("num_search_threads", num_threads_);
 
