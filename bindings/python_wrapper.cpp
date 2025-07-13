@@ -231,6 +231,7 @@ public:
         }
 
         std::cout << "Insertion completed" << std::endl;
+//        merge_insert_->trigger_merge();
     }
 
     bool insert_single(const py::array_t<T>& point, TagT tag) {
@@ -338,7 +339,7 @@ public:
         }
 
         std::cout << "Performing final merge..." << std::endl;
-        merge_insert_->final_merge();
+        merge_insert_->trigger_merge();
         std::cout << "Final merge completed" << std::endl;
     }
 

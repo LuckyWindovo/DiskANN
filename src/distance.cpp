@@ -16,7 +16,7 @@
 
 namespace diskann {
 
-  int algo_type = 2;
+  int algo_type = 0;
   // Cosine similarity.
   float DistanceCosineInt8::compare(const int8_t *a, const int8_t *b,
                                     uint32_t length) const {

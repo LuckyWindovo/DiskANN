@@ -313,6 +313,7 @@ namespace diskann {
  {
      if(_mem_points >= _merge_th)
      {
+       	diskann::cout << "Inside trigger_merge." << std::endl;
          save_del_set();
          switch_index();
          return 1;
