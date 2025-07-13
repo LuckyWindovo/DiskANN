@@ -81,13 +81,23 @@ namespace diskann {
     // data is stored to _nd * aligned_dim matrix with necessary
     // zero-padding
     _aligned_dim = ROUND_UP(_dim, 8);
-
+    std::cout << "***********************************************" << std::endl;
+    if (diskann::algo_type == diskann::AlgoType::CUFE)
+      diskann::cout << "CUFE is in dynamic_index_builder" << std::endl;
     if (dynamic_index)
       _num_frozen_pts = 1;
-
-    alloc_aligned(((void **) &_data),
-                  (_max_points + _num_frozen_pts) * _aligned_dim * sizeof(T),
-                  8 * sizeof(T));
+    if (diskann::algo_type != diskann::AlgoType::PYANNS)
+      alloc_aligned(((void **) &_data),
+                    (_max_points + _num_frozen_pts) * _aligned_dim * sizeof(T),
+                    8 * sizeof(T));
+    else {
+      std::cout << "Pyanns is in InMemDataStore constructor" << std::endl;
+      constexpr size_t alignment = 2 * 1024 * 1024;
+      size_t size = (_max_points + _num_frozen_pts) * _aligned_dim * sizeof(T);
+      size = (size + alignment - 1) / alignment * alignment;
+      alloc_aligned(((void **) &_data), size, alignment);
+      madvise(_data, size, MADV_HUGEPAGE);
+    }
     std::memset(_data, 0,
                 (_max_points + _num_frozen_pts) * _aligned_dim * sizeof(T));
 
@@ -646,42 +656,30 @@ namespace diskann {
     uint32_t hops = 0;
     uint32_t cmps = 0;
 
-    while (k < l) {
-      unsigned nk = l;
+    while (true) {
+      bool has_more = false;
 
-      if (best_L_nodes[k].flag) {
+      if (diskann::algo_type != diskann::AlgoType::CUFE) {
+        if (k >= l || !best_L_nodes[k].flag)
+          break;
+
+        auto nbr = best_L_nodes[k];
         best_L_nodes[k].flag = false;
-        auto n = best_L_nodes[k].id;
-        if (!(best_L_nodes[k].id == _ep && _num_frozen_pts > 0 &&
-              !ret_frozen)) {
-          expanded_nodes_info.emplace_back(best_L_nodes[k]);
+        auto n = nbr.id;
+        has_more = true;
+
+        if (!(n == _ep && _num_frozen_pts > 0 && !ret_frozen)) {
+          expanded_nodes_info.emplace_back(nbr);
           expanded_nodes_ids.insert(n);
         }
+
         std::vector<unsigned> des;
-        if (_dynamic_index) {
-          LockGuard guard(_locks[n]);
-          for (unsigned m = 0; m < _final_graph[n].size(); m++) {
-            if (_final_graph[n][m] >= _max_points + _num_frozen_pts) {
-              diskann::cerr << "Wrong id found: " << _final_graph[n][m]
-                            << std::endl;
-              throw diskann::ANNException(
-                  std::string("Wrong id found") +
-                      std::to_string(_final_graph[n][m]),
-                  -1, __FUNCSIG__, __FILE__, __LINE__);
-            }
-            des.emplace_back(_final_graph[n][m]);
-          }
-        } else {
-          for (unsigned m = 0; m < _final_graph[n].size(); m++) {
-            if (_final_graph[n][m] >= _max_points + _num_frozen_pts) {
-              diskann::cerr << "Wrong id found: " << _final_graph[n][m]
-                            << std::endl;
-              throw diskann::ANNException(
-                  std::string("Wrong id found") +
-                      std::to_string(_final_graph[n][m]),
-                  -1, __FUNCSIG__, __FILE__, __LINE__);
-            }
-            des.emplace_back(_final_graph[n][m]);
+        {
+          if (_dynamic_index) {
+            LockGuard guard(_locks[n]);
+            des = _final_graph[n];
+          } else {
+            des = _final_graph[n];
           }
         }
 
@@ -709,20 +707,166 @@ namespace diskann {
             unsigned r = InsertIntoPool(best_L_nodes.data(), l, nn);
             if (l < Lsize)
               ++l;
-            if (r < nk)
-              nk = r;
+            if (r < k)
+              k = r;
           }
         }
 
-        if (nk <= k)
-          k = nk;
-        else
-          ++k;
-      } else
-        k++;
+        ++k;
+
+      } else {
+        // ------------------------------
+        // CUFE 模拟 closest_unexpanded_beam()
+        // ------------------------------
+        //        std::cout << "**************************************" <<
+        //        std::endl; std::cout << "Farah is in closest_unexpanded
+        //        greedy" << std::endl;
+
+        std::vector<Neighbor> beam;
+        size_t                beam_count = 0;
+        for (; k < l && beam_count < 2; ++k) {
+          if (best_L_nodes[k].flag) {
+            best_L_nodes[k].flag = false;
+            beam.push_back(best_L_nodes[k]);
+            beam_count++;
+          }
+        }
+
+        if (beam.empty())
+          break;
+
+        has_more = true;
+
+        for (auto nbr : beam) {
+          auto n = nbr.id;
+
+          if (!(n == _ep && _num_frozen_pts > 0 && !ret_frozen)) {
+            expanded_nodes_info.emplace_back(nbr);
+            expanded_nodes_ids.insert(n);
+          }
+
+          std::vector<unsigned> des;
+          {
+            if (_dynamic_index) {
+              LockGuard guard(_locks[n]);
+              des = _final_graph[n];
+            } else {
+              des = _final_graph[n];
+            }
+          }
+
+          for (unsigned m = 0; m < des.size(); ++m) {
+            unsigned id = des[m];
+            if (inserted_into_pool.find(id) == inserted_into_pool.end()) {
+              inserted_into_pool.insert(id);
+
+              if ((m + 1) < des.size()) {
+                auto nextn = des[m + 1];
+                diskann::prefetch_vector(
+                    (const char *) _data + _aligned_dim * (size_t) nextn,
+                    sizeof(T) * _aligned_dim);
+              }
+
+              cmps++;
+              float dist = _distance->compare(
+                  node_coords, _data + _aligned_dim * (size_t) id,
+                  (unsigned) _aligned_dim);
+
+              if (dist >= best_L_nodes[l - 1].distance && (l == Lsize))
+                continue;
+
+              Neighbor nn(id, dist, true);
+              unsigned r = InsertIntoPool(best_L_nodes.data(), l, nn);
+              if (l < Lsize)
+                ++l;
+            }
+          }
+        }
+      }
+
+      if (!has_more)
+        break;
     }
     return std::make_pair(hops, cmps);
   }
+
+  //    while (k < l) {
+  //      unsigned nk = l;
+  //
+  //      if (best_L_nodes[k].flag) {
+  //        best_L_nodes[k].flag = false;
+  //        auto n = best_L_nodes[k].id;
+  //        if (!(best_L_nodes[k].id == _ep && _num_frozen_pts > 0 &&
+  //              !ret_frozen)) {
+  //          expanded_nodes_info.emplace_back(best_L_nodes[k]);
+  //          expanded_nodes_ids.insert(n);
+  //        }
+  //        std::vector<unsigned> des;
+  //        if (_dynamic_index) {
+  //          LockGuard guard(_locks[n]);
+  //          for (unsigned m = 0; m < _final_graph[n].size(); m++) {
+  //            if (_final_graph[n][m] >= _max_points + _num_frozen_pts) {
+  //              diskann::cerr << "Wrong id found: " << _final_graph[n][m]
+  //                            << std::endl;
+  //              throw diskann::ANNException(
+  //                  std::string("Wrong id found") +
+  //                      std::to_string(_final_graph[n][m]),
+  //                  -1, __FUNCSIG__, __FILE__, __LINE__);
+  //            }
+  //            des.emplace_back(_final_graph[n][m]);
+  //          }
+  //        } else {
+  //          for (unsigned m = 0; m < _final_graph[n].size(); m++) {
+  //            if (_final_graph[n][m] >= _max_points + _num_frozen_pts) {
+  //              diskann::cerr << "Wrong id found: " << _final_graph[n][m]
+  //                            << std::endl;
+  //              throw diskann::ANNException(
+  //                  std::string("Wrong id found") +
+  //                      std::to_string(_final_graph[n][m]),
+  //                  -1, __FUNCSIG__, __FILE__, __LINE__);
+  //            }
+  //            des.emplace_back(_final_graph[n][m]);
+  //          }
+  //        }
+  //
+  //        for (unsigned m = 0; m < des.size(); ++m) {
+  //          unsigned id = des[m];
+  //          if (inserted_into_pool.find(id) == inserted_into_pool.end()) {
+  //            inserted_into_pool.insert(id);
+  //
+  //            if ((m + 1) < des.size()) {
+  //              auto nextn = des[m + 1];
+  //              diskann::prefetch_vector(
+  //                  (const char *) _data + _aligned_dim * (size_t) nextn,
+  //                  sizeof(T) * _aligned_dim);
+  //            }
+  //
+  //            cmps++;
+  //            float dist = _distance->compare(node_coords,
+  //                                            _data + _aligned_dim * (size_t)
+  //                                            id, (unsigned) _aligned_dim);
+  //
+  //            if (dist >= best_L_nodes[l - 1].distance && (l == Lsize))
+  //              continue;
+  //
+  //            Neighbor nn(id, dist, true);
+  //            unsigned r = InsertIntoPool(best_L_nodes.data(), l, nn);
+  //            if (l < Lsize)
+  //              ++l;
+  //            if (r < nk)
+  //              nk = r;
+  //          }
+  //        }
+  //
+  //        if (nk <= k)
+  //          k = nk;
+  //        else
+  //          ++k;
+  //      } else
+  //        k++;
+  //    }
+  //    return std::make_pair(hops, cmps);
+  //  }
 
   template<typename T, typename TagT>
   void Index<T, TagT>::iterate_to_fixed_point(

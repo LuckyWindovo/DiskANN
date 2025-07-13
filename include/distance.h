@@ -100,7 +100,10 @@ namespace {
 }  // namespace
 
 namespace diskann {
+
   //  enum Metric { L2 = 0, INNER_PRODUCT = 1, FAST_L2 = 2, PQ = 3 };
+  enum AlgoType { DISKANN = 0, CUFE = 1, PYANNS = 2 };
+  extern int algo_type;
   template<typename T>
   class Distance {
    public:
