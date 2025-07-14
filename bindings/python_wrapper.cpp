@@ -377,39 +377,39 @@ PYBIND11_MODULE(freshdiskann, m) {
     m.doc() = "FreshDiskANN Python bindings";
 
     // 导出float版本的索引
-    py::class_<DiskANNIndex<uint8_t>>(m, "Index")
+    py::class_<DiskANNIndex<float>>(m, "Index")
         .def(py::init<>())
-        .def("setup", &DiskANNIndex<uint8_t>::setup,
+        .def("setup", &DiskANNIndex<float>::setup,
              "Setup index parameters",
              py::arg("max_pts"), py::arg("ndim"), py::arg("R") = 64,
              py::arg("L") = 100, py::arg("num_threads") = 1)
-        .def("build", &DiskANNIndex<uint8_t>::build,
+        .def("build", &DiskANNIndex<float>::build,
              "Build index from data",
              py::arg("data"), py::arg("npts"), py::arg("tags"))
-        .def("insert_concurrent", &DiskANNIndex<uint8_t>::insert_concurrent,
+        .def("insert_concurrent", &DiskANNIndex<float>::insert_concurrent,
              "Insert points concurrently",
              py::arg("data"), py::arg("tags"), py::arg("insert_thread_count") = 1)
-        .def("insert", &DiskANNIndex<uint8_t>::insert_single,
+        .def("insert", &DiskANNIndex<float>::insert_single,
              "Insert single point",
              py::arg("point"), py::arg("tag"))
-        .def("remove", &DiskANNIndex<uint8_t>::remove,
+        .def("remove", &DiskANNIndex<float>::remove,
              "Remove points by tags",
              py::arg("tags"))
-        .def("query", &DiskANNIndex<uint8_t>::query,
+        .def("query", &DiskANNIndex<float>::query,
              "Query k nearest neighbors",
              py::arg("query_point"), py::arg("k"), py::arg("search_L") = 0)
-        .def("batch_query", &DiskANNIndex<uint8_t>::batch_query,
+        .def("batch_query", &DiskANNIndex<float>::batch_query,
              "Batch query k nearest neighbors",
              py::arg("queries"), py::arg("k"), py::arg("search_thread_count") = 1)
-        .def("final_merge", &DiskANNIndex<uint8_t>::final_merge,
+        .def("final_merge", &DiskANNIndex<float>::final_merge,
              "Perform final merge of pending operations")
-        .def("save_index", &DiskANNIndex<uint8_t>::save_index,
+        .def("save_index", &DiskANNIndex<float>::save_index,
              "Save index to file",
              py::arg("filepath"))
-        .def("load_index", &DiskANNIndex<uint8_t>::load_index,
+        .def("load_index", &DiskANNIndex<float>::load_index,
              "Load index from file",
              py::arg("filepath"))
-        .def("get_stats", &DiskANNIndex<uint8_t>::get_stats,
+        .def("get_stats", &DiskANNIndex<float>::get_stats,
              "Get index statistics");
 
 }
