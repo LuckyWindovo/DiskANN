@@ -716,7 +716,7 @@ namespace diskann {
 
       } else {
         // ------------------------------
-        // CUFE 模拟 closest_unexpanded_beam()
+        // CUFE
         // ------------------------------
         //        std::cout << "**************************************" <<
         //        std::endl; std::cout << "Farah is in closest_unexpanded
