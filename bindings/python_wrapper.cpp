@@ -1,7 +1,3 @@
-//
-// Created by mingqi on 25-7-5.
-//
-
 // diskann_pybind.cpp
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
@@ -51,7 +47,6 @@ private:
     std::atomic<bool> insertions_done_{true};
     std::atomic<bool> deletions_done_{true};
 
-    // 临时文件管理
     std::string temp_data_file_;
     std::string temp_tags_file_;
 
@@ -65,7 +60,6 @@ private:
         uint32_t npts = buf.shape[0];
         uint32_t ndim = buf.shape[1];
 
-        // 保存数据点
         std::ofstream data_writer(temp_data_file_, std::ios::binary);
         data_writer.write(reinterpret_cast<const char*>(&npts), sizeof(uint32_t));
         data_writer.write(reinterpret_cast<const char*>(&ndim), sizeof(uint32_t));
@@ -73,7 +67,6 @@ private:
                          npts * ndim * sizeof(T));
         data_writer.close();
 
-        // 保存标签
         std::ofstream tags_writer(temp_tags_file_, std::ios::binary);
         uint32_t tag_count = tags.size();
         uint32_t tag_dim = 1;
@@ -91,13 +84,11 @@ public:
         base_prefix_ = working_folder_ + "/base_index";
         merge_prefix_ = working_folder_ + "/merge_index";
 
-        // 创建工作目录
         system(("mkdir -p " + working_folder_).c_str());
         create_temp_files();
     }
 
     ~DiskANNIndex() {
-        // 清理临时文件
         // system(("rm -rf " + working_folder_).c_str());
     }
 
@@ -109,7 +100,6 @@ public:
         L_ = L;
         num_threads_ = num_threads;
 
-        // 初始化距离函数
         if constexpr (std::is_same<T, float>::value) {
             distance_ = std::make_unique<diskann::DistanceL2>();
         } else if constexpr (std::is_same<T, uint8_t>::value) {
@@ -135,10 +125,8 @@ public:
             throw std::runtime_error("Data shape mismatch");
         }
 
-        // 保存数据到临时文件
         save_data_to_file(data, tags);
 
-        // 构建基础索引
         std::cout << "Building base disk index..." << std::endl;
         std::string build_params = std::to_string(R_) + " " + std::to_string(L_) +
                                   " " + std::to_string(3) + " " + std::to_string(3) +
@@ -157,7 +145,6 @@ public:
             throw std::runtime_error("Failed to build base disk index");
         }
 
-        // 初始化MergeInsert
         diskann::Parameters params;
         params.Set<unsigned>("L_mem", L_);
         params.Set<unsigned>("R_mem", R_);
@@ -204,7 +191,6 @@ public:
 
         std::cout << "Inserting " << npts << " points with " << insert_thread_count << " threads" << std::endl;
 
-        // 并发插入
         std::vector<std::future<void>> futures;
         uint32_t points_per_thread = npts / insert_thread_count;
 
@@ -225,7 +211,6 @@ public:
             }));
         }
 
-        // 等待所有线程完成
         for (auto& future : futures) {
             future.wait();
         }
@@ -256,7 +241,6 @@ public:
         std::cout << "Removing " << tags.size() << " points" << std::endl;
 
         for (TagT tag : tags) {
-//            TODO: 使用inplace_delete而不是lazy_delete以获得更好的性能;IP-dsiaknn与freshdiskann的主要区别就在
             merge_insert_->lazy_delete(tag);
         }
 
@@ -304,7 +288,6 @@ public:
         uint32_t nqueries = buf.shape[0];
         T* queries_ptr = static_cast<T*>(buf.ptr);
 
-        // 准备结果数组
         auto result_tags = py::array_t<TagT>(nqueries * k);
         auto result_dists = py::array_t<float>(nqueries * k);
 
@@ -314,7 +297,6 @@ public:
         TagT* tags_ptr = static_cast<TagT*>(tags_buf.ptr);
         float* dists_ptr = static_cast<float*>(dists_buf.ptr);
 
-        // 并发查询
         #pragma omp parallel for num_threads(search_thread_count)
         for (uint32_t i = 0; i < nqueries; ++i) {
             T* query_ptr = queries_ptr + i * ndim_;
@@ -326,7 +308,6 @@ public:
                                       result_tags_ptr, result_dists_ptr, &stats);
         }
 
-        // 重新调整数组形状
         result_tags.resize({nqueries, k});
         result_dists.resize({nqueries, k});
 
@@ -348,19 +329,14 @@ public:
             throw std::runtime_error("Index not built yet");
         }
 
-        // 实现索引保存逻辑
         std::cout << "Saving index to " << filepath << std::endl;
-        // 这里需要根据实际的DiskANN API来实现
     }
 
     void load_index(const std::string& filepath) {
-        // 实现索引加载逻辑
         std::cout << "Loading index from " << filepath << std::endl;
-        // 这里需要根据实际的DiskANN API来实现
         is_built_ = true;
     }
 
-    // 获取索引统计信息
     std::map<std::string, uint32_t> get_stats() const {
         std::map<std::string, uint32_t> stats;
         stats["max_pts"] = max_pts_;
@@ -376,7 +352,6 @@ public:
 PYBIND11_MODULE(freshdiskann, m) {
     m.doc() = "FreshDiskANN Python bindings";
 
-    // 导出float版本的索引
     py::class_<DiskANNIndex<float>>(m, "Index")
         .def(py::init<>())
         .def("setup", &DiskANNIndex<float>::setup,
