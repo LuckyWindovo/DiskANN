@@ -620,8 +620,8 @@ namespace diskann {
       max_degree =
           ((max_node_len - data_dim * sizeof(T)) / sizeof(unsigned)) - 1;
 
-      diskann::cout << "Disk-Index File Meta-data: "
-                    << "# nodes per sector: " << nnodes_per_sector
+      diskann::cout << "Disk-Index File Meta-data: " << "# nodes per sector: "
+                    << nnodes_per_sector
                     << ", max node len (bytes): " << max_node_len
                     << ", max node degree: " << max_degree << ", npts: " << nr
                     << ", dim: " << nc << " disk_nnodes: " << disk_nnodes
@@ -1165,8 +1165,8 @@ namespace diskann {
               continue;
             Neighbor nn(id, dist, true);
             auto     r = InsertIntoPool(
-                    retset.data(), cur_list_size,
-                    nn);  // Return position in sorted list where nn inserted.
+                retset.data(), cur_list_size,
+                nn);  // Return position in sorted list where nn inserted.
             if (cur_list_size < l_search)
               ++cur_list_size;
             if (r < nk)
@@ -1247,8 +1247,8 @@ namespace diskann {
               continue;
             Neighbor nn(id, dist, true);
             auto     r = InsertIntoPool(
-                    retset.data(), cur_list_size,
-                    nn);  // Return position in sorted list where nn inserted.
+                retset.data(), cur_list_size,
+                nn);  // Return position in sorted list where nn inserted.
             if (cur_list_size < l_search)
               ++cur_list_size;
             if (r < nk)

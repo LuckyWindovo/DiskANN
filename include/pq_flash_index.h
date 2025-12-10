@@ -92,8 +92,8 @@ namespace diskann {
                                bool new_index_format = true);
 #else
     // load compressed data, and obtains the handle to the disk-resident index
-    DISKANN_DLLEXPORT int  load(const char *index_prefix, uint32_t num_threads,
-                                bool new_index_format = true);
+    DISKANN_DLLEXPORT int load(const char *index_prefix, uint32_t num_threads,
+                               bool new_index_format = true);
 #endif
     DISKANN_DLLEXPORT void load_tags(const std::string &tag_file,
                                      size_t             offset = 0);
@@ -189,7 +189,7 @@ namespace diskann {
     // deflates `vec` into PQ ids
     DISKANN_DLLEXPORT std::vector<_u8> deflate_vector(const T *vec);
     std::pair<_u8 *, _u32>             get_pq_config() {
-                  return std::make_pair(this->data, (uint32_t) this->n_chunks);
+      return std::make_pair(this->data, (uint32_t) this->n_chunks);
     }
     DISKANN_DLLEXPORT TagT *get_tags() {
       return this->tags;

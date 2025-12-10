@@ -1321,9 +1321,9 @@ namespace diskann {
           diskann::cout.precision(4);
           diskann::cout << "Completed  (round: " << rnd_no
                         << ", sync: " << sync_num << "/" << NUM_SYNCS
-                        << " with L " << L << ")"
-                        << " sync_time: " << sync_time << "s"
-                        << "; inter_time: " << inter_time << "s" << std::endl;
+                        << " with L " << L << ")" << " sync_time: " << sync_time
+                        << "s" << "; inter_time: " << inter_time << "s"
+                        << std::endl;
 
           total_sync_time += sync_time;
           total_inter_time += inter_time;
@@ -1493,9 +1493,8 @@ namespace diskann {
       if (_enable_tags && tags.size() != num_points_to_load) {
         std::stringstream stream;
         stream << "ERROR: Driver requests loading " << num_points_to_load
-               << " points from file,"
-               << "but tags vector is of size " << tags.size() << "."
-               << std::endl;
+               << " points from file," << "but tags vector is of size "
+               << tags.size() << "." << std::endl;
         std::cerr << stream.str() << std::endl;
         aligned_free(_data);
         throw diskann::ANNException(stream.str(), -1, __FUNCSIG__, __FILE__,

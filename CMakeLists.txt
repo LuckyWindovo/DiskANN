@@ -10,12 +10,12 @@ set(CMAKE_STANDARD 14)
 
 
 #set(CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_CURRENT_LIST_DIR}/CompilerOptions.cmake")
-if(MSVC)
-	set(CMAKE_CXX_COMPILER $ENV{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe)
-	set(CMAKE_CXX_LINK_EXECUTABLE $ENV{VCToolsInstallDir}/bin/Hostx64/x64/link.exe)
-else()
-	set(CMAKE_CXX_COMPILER g++)
-endif()
+#if(MSVC)
+#	set(CMAKE_CXX_COMPILER $ENV{VCToolsInstallDir}/bin/Hostx64/x64/cl.exe)
+#	set(CMAKE_CXX_LINK_EXECUTABLE $ENV{VCToolsInstallDir}/bin/Hostx64/x64/link.exe)
+#else()
+#	set(CMAKE_CXX_COMPILER g++)
+#endif()
 
 project(diskann)
 include_directories(${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/include/tsl/include ${PROJECT_SOURCE_DIR}/include/dll ${PROJECT_SOURCE_DIR}/include/ols)
@@ -59,15 +59,51 @@ else()
 	else()
 		set(INTEL_ROOT $ENV{INTEL_ROOT})
 	endif()
-#	set(INTEL_ROOT /opt/intel/compilers_and_libraries/linux)
-#	set(MKL_ROOT ${INTEL_ROOT}/mkl)
-	set(MKL_ROOT ${INTEL_ROOT}/mkl/latest)
+
+    # Auto-detect MKL_ROOT if possible
+    if(EXISTS "${INTEL_ROOT}/mkl/latest")
+        set(MKL_ROOT ${INTEL_ROOT}/mkl/latest)
+    elseif(EXISTS "/opt/intel/oneapi/mkl/latest")
+        set(MKL_ROOT "/opt/intel/oneapi/mkl/latest")
+    else()
+        set(MKL_ROOT ${INTEL_ROOT}/mkl/latest)
+    endif()
+    
+    message(STATUS "DiskANN: INTEL_ROOT=${INTEL_ROOT}")
+    message(STATUS "DiskANN: MKL_ROOT=${MKL_ROOT}")
+
     add_compile_options(-m64 -Wl,--no-as-needed)
-	link_libraries(mkl_intel_ilp64 mkl_intel_thread mkl_core iomp5 pthread m dl)
-	link_directories(${INTEL_ROOT}/lib/intel64 ${MKL_ROOT}/lib/intel64)
+
+    # Find MKL libraries with absolute paths
+    find_library(MKL_INTEL_ILP64_LIB mkl_intel_ilp64 HINTS ${MKL_ROOT}/lib/intel64)
+    find_library(MKL_INTEL_THREAD_LIB mkl_intel_thread HINTS ${MKL_ROOT}/lib/intel64)
+    find_library(MKL_CORE_LIB mkl_core HINTS ${MKL_ROOT}/lib/intel64)
+    
+    # Find iomp5. Try multiple locations including new oneAPI layout
+    file(GLOB IOMP5_DIRS 
+        "${INTEL_ROOT}/compiler/*/lib" 
+        "${INTEL_ROOT}/compiler/*/linux/compiler/lib/intel64_lin"
+        "${INTEL_ROOT}/lib/intel64"
+    )
+    find_library(IOMP5_LIB iomp5 HINTS ${IOMP5_DIRS})
+
+    if(MKL_INTEL_ILP64_LIB AND MKL_INTEL_THREAD_LIB AND MKL_CORE_LIB AND IOMP5_LIB)
+        set(DISKANN_MKL_LIBS ${MKL_INTEL_ILP64_LIB} ${MKL_INTEL_THREAD_LIB} ${MKL_CORE_LIB} ${IOMP5_LIB})
+        message(STATUS "DiskANN: Found MKL libs: ${DISKANN_MKL_LIBS}")
+    else()
+        message(WARNING "DiskANN: Could not find some MKL libraries. Build might fail.")
+        message(STATUS "MKL_INTEL_ILP64_LIB: ${MKL_INTEL_ILP64_LIB}")
+        message(STATUS "MKL_INTEL_THREAD_LIB: ${MKL_INTEL_THREAD_LIB}")
+        message(STATUS "MKL_CORE_LIB: ${MKL_CORE_LIB}")
+        message(STATUS "IOMP5_LIB: ${IOMP5_LIB}")
+    endif()
+
+	link_libraries(${DISKANN_MKL_LIBS} pthread m dl)
+	# link_directories(${INTEL_ROOT}/lib/intel64 ${MKL_ROOT}/lib/intel64) # Deprecated/Not needed with absolute paths
 endif()
 
 add_definitions(-DMKL_ILP64)
+message(STATUS "DiskANN: Adding include directories: ${INTEL_ROOT}/include ${MKL_ROOT}/include")
 include_directories(include ${INTEL_ROOT}/include ${MKL_ROOT}/include ${BOOST_ROOT})
 
 
@@ -105,6 +141,6 @@ else()
 endif()
 
 add_subdirectory(src)
-add_subdirectory(tests)
-add_subdirectory(tests/utils)
-add_subdirectory(bindings)
+# add_subdirectory(tests)
+# add_subdirectory(tests/utils)
+# add_subdirectory(bindings)

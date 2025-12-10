@@ -462,8 +462,7 @@ void run_iter(diskann::MergeInsert<T>  &merge_insert,
               << " seconds " << std::endl;
     search_kernel<T>(merge_insert, active_set, true);
 
-    std::cout << "ITER: Seeding iteration"
-              << "\n";
+    std::cout << "ITER: Seeding iteration" << "\n";
     // seed the iteration
     tsl::robin_set<uint32_t> deleted_tags;
     seed_iter<T, TagT>(active_set, inactive_set, mem_pts_file, mem_tags_file,
@@ -506,8 +505,7 @@ void run_single_iter(diskann::MergeInsert<T>  &merge_insert,
                   << " seconds " << std::endl;
         search_kernel<T>(merge_insert, active_set, true);
         */
-    std::cout << "ITER: Seeding iteration"
-              << "\n";
+    std::cout << "ITER: Seeding iteration" << "\n";
     // seed the iteration
     tsl::robin_set<uint32_t> deleted_tags;
     seed_iter<T, TagT>(active_set, inactive_set, mem_pts_file, mem_tags_file,
